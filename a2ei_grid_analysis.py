@@ -36,6 +36,7 @@ today = datetime.today()
 time_start = st.sidebar.date_input('Start', value=(datetime(2022, 3, 12)))
 time_end = st.sidebar.date_input('End', today)
 
+rng=[time_start,time_end]
 
 df_mppt = pd.read_sql(f'''  
                             SELECT 
