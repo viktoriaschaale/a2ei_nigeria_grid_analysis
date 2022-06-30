@@ -2,6 +2,7 @@
 
 import streamlit as st
 import psycopg2
+import pandas as pd 
 from datetime import datetime, date, time , timedelta
 
 
@@ -19,7 +20,7 @@ aam_id = str(st.sidebar.text_input('AAM ID', 943))  # Set System Name
 
 db_select = st.sidebar.radio(
     "Choose your Database",
-    ('postgres', 'aws', 'local'))
+    ('aws','office'))
 
 
 def init_connection():
