@@ -1,3 +1,5 @@
+# cd Documents/git/a2ei_nigeria_grid_analysis/ ; streamlit run a2ei_grid_analysis.py
+
 import streamlit as st
 import psycopg2
 
