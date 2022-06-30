@@ -3,8 +3,8 @@
 import streamlit as st
 import psycopg2
 import pandas as pd 
-#import plotly.graph_objects as go
-#import plotly.express as px
+import plotly.graph_objects as go
+import plotly.express as px
 from datetime import datetime, date, time , timedelta
 from plotly.subplots import make_subplots
 
