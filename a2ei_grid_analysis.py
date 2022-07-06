@@ -21,7 +21,7 @@ st.set_page_config(
 st.markdown("<h1 style='text-align: center; color: rgb(223,116,149);'>A2EI Grid Analysis Tool</h1>", unsafe_allow_html=True)
 
 # Sidebar elements
-aam_id = str(st.sidebar.text_input('AAM ID', 943))  # Set System Name
+aam_id = str(st.sidebar.text_input('AAM ID', 945))  # Set System Name
 
 #change to "office" if you are in the A2EI headquarter for faster queries
 db_select = "aws"
@@ -36,7 +36,7 @@ conn = init_connection()
 # set today's date
 today = datetime.today()
 
-time_start = st.sidebar.date_input('Start', value=(datetime(2022, 3, 12)))
+time_start = st.sidebar.date_input('Start', value=(datetime(2021, 1, 1)))
 time_end = st.sidebar.date_input('End', today)
 
 # Database queries
@@ -301,8 +301,8 @@ with st.expander('Grid Analysis'):
     col1, col2= st.columns([1,1])
     with col1:
         st.info('avg_input_voltage: '+str( avg_input_voltage))
-        st.info('min_input_voltage: '+str( avg_input_voltage))
-        st.info('max_input_voltage: '+str( avg_input_voltage))
+        st.info('min_input_voltage: '+str( min_input_voltage))
+        st.info('max_input_voltage: '+str( max_input_voltage))
     
     with col2:
         st.info('avg_peak_voltage: '+str(  avg_peak_voltage ))
