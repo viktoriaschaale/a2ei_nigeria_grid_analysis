@@ -65,8 +65,6 @@ df = df.sort_values(by = ['time'])
 df['time'] = pd.to_datetime(df['time'])
 df.set_index(df['time'],inplace=True)
 
-df
-
 #Create other usefull columns in df
 df_grid=pd.DataFrame(columns=['input_voltage','peak_voltage','output_voltage','input_voltage_0tonan','peak_voltage_0tonan','output_voltage_5tonan','grid_avl'])
 df_grid['input_voltage']=df['input_voltage']
@@ -80,25 +78,26 @@ df_grid['grid_avl'].mask(df['input_voltage']>0,1,inplace=True)
 df_grid['grid_avl'].mask(df['input_voltage']==0,0,inplace=True)
 df_grid['grid_avl']=df_grid['grid_avl'].fillna(0)#make all nan to 0 or BL
 
-df_grid
+#df_grid
 
 #resample the 5min data to 1 hour data
 hour_data= pd.DataFrame(columns=['grid_avl_h','grid_avl_h_usb','load_w_h','pv_w_h'])
 hour_data['grid_avl_h']=df_grid['grid_avl'].resample('H').mean()
 
-hour_data
+#hour_data
 
 # Grouped hourly data to display one typical day
 typ_day=pd.DataFrame(columns=['avg_grid_avl','avg_grid_avl_usb','avg_load_w','avg_pv_w','avg_bat_v'])
 typ_day['avg_grid_avl']=hour_data['grid_avl_h'].groupby(hour_data.index.hour).mean()
 
-typ_day
+#typ_day
 
 ###  group also by day of year to get all the points for every hour to plot box plot
 typ_day_all=pd.DataFrame(columns=['avg_grid_avl','avg_grid_avl_usb','avg_load_w','avg_pv_w','avg_bat_v'])
 typ_day_all['avg_grid_avl']=df_grid['grid_avl'].groupby([df_grid.index.dayofyear.rename('day of year'),df_grid.index.hour.rename('hour')]).mean()
 
-typ_day_all
+#typ_day_all
+
 #create usefull values from df
 avg_input_voltage= round((df_grid['input_voltage_0tonan'].mean()),1)
 min_input_voltage= round((df_grid['input_voltage_0tonan'].min()),1)
@@ -217,7 +216,7 @@ with st.expander('Grid Analysis'):
                                 showticklabels=True,
                                 gridcolor='lightgrey',
                                 tickfont=dict(family="Fugue",size=12, color='Black'),
-                                range=[180,250],
+                                range=[100,250],
                                 ),
                             font=dict( family="Fugue", size=12, color='black'),
                             autosize=False,
@@ -279,7 +278,7 @@ with st.expander('Grid Analysis'):
                                 showticklabels=True,
                                 gridcolor='lightgrey',
                                 tickfont=dict(family="Fugue",size=12, color='Black'),
-                                range=[150,300],
+                                range=[100,250],
                                 ),
                             font=dict( family="Fugue", size=12, color='black'),
                             autosize=False,
@@ -297,7 +296,20 @@ with st.expander('Grid Analysis'):
                                 )                                
         st.plotly_chart(fig, use_container_width=True)
         #fig.write_image("grid_V_box_plot.pdf")
-
+    #########################################
+        
+    col1, col2= st.columns([1,1])
+    with col1:
+        st.info('avg_input_voltage: '+str( avg_input_voltage))
+        st.info('min_input_voltage: '+str( avg_input_voltage))
+        st.info('max_input_voltage: '+str( avg_input_voltage))
+    
+    with col2:
+        st.info('avg_peak_voltage: '+str(  avg_peak_voltage ))
+        st.info('min_peak_voltage: '+str(  min_peak_voltage ))
+        st.info('max_peak_voltage: '+str(  max_peak_voltage ))
+        
+    ##########################################
     ################################
 
     st.markdown("<h3 style='text-align: center'>Hourly Grid Availability Profile</h3>", unsafe_allow_html=True)
