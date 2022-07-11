@@ -46,7 +46,7 @@ conn = init_connection()
 # set today's date
 today = datetime.today()
 
-time_start = st.sidebar.date_input('Start', value=(datetime(2021, 1, 1)))
+time_start = st.sidebar.date_input('Start', value=(datetime(2022, 3, 1)))
 time_end = st.sidebar.date_input('End', today)
 
 # Database queries
@@ -64,14 +64,32 @@ df = pd.read_sql(f'''
                                 time between \'{rng[0]}\' and \'{rng[1]}\'
                             ORDER BY time
                         ''', conn)
-# df_meta=
+cust = pd.read_sql(f''' SELECT
+                           aam_id, 
+                           country, 
+                           location, 
+                           latitude, 
+                           longitude,
+                           cust_type,
+                           bat_size, 
+                           inv_size,
+                           mcu_version,
+                           installation_date, 
+                           installation_comp
+                        FROM
+                           skgs_customers
+                        WHERE
+                           aam_id = {aam_id}
+                        ''', conn)
 
 # meta data about system
-# st.sidebar.header('Metadata AAM:')
-st.sidebar.markdown(
-    f'<p style="color:#FFFFFF;font-size: 25px;">Metadata AAM: {aam_id}</p>', unsafe_allow_html=True)
+st.sidebar.text("")
+st.sidebar.text("")
 
-# st.sidebar.table(aam_main_sidebar.T)
+st.sidebar.markdown(
+    f'<p style="color:#FFFFFF;font-size: 25px;text-align:center;">Meta Data AAM <strong>{aam_id}</strong> <br> </p>', unsafe_allow_html=True)
+st.sidebar.markdown(
+    f'<p style="color:#FFFFFF;font-size: 20px;">{cust.country[0]} <br> Version {cust.mcu_version[0]} <br> Battery {cust.bat_size[0]} Ah <br> Inverter {cust.inv_size[0]} W <br > Installed on {cust.installation_date[0].strftime("%Y-%m-%d")} <br> Installed by {cust.installation_comp[0]} </p>', unsafe_allow_html=True)
 
 # Data prep
 df = df.sort_values(by=['time'])
