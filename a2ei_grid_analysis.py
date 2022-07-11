@@ -51,8 +51,7 @@ time_end = st.sidebar.date_input('End', today)
 
 # Database queries
 rng = [time_start, time_end]
-df = pd.read_sql(f'''
-                            SELECT
+df = pd.read_sql(f'''       SELECT
                                 time + interval '1 hour' AS time
                                 ,input_voltage
                                 ,peak_voltage
