@@ -1,0 +1,8 @@
+[theme]
+base="light"
+primaryColor="#FCA3BE"
+backgroundColor="#FFFFFF" # main page
+secondaryBackgroundColor="#E73E80" # sidebar
+#textColor="#262730"
+textColor="#000000"
+font="sans serif"
