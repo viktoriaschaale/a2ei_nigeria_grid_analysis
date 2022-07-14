@@ -13,7 +13,7 @@ import numpy as np
 # Page design configutration
 st.set_page_config(
     page_title="A2EI Grid Analysis",
-    page_icon=":sunny:",
+    page_icon=":electric_plug:",
     initial_sidebar_state="expanded",
     layout="wide",
 )
@@ -46,7 +46,7 @@ conn = init_connection()
 # set today's date
 today = datetime.today()
 
-time_start = st.sidebar.date_input('Start', value=(datetime(2022, 3, 1)))
+time_start = st.sidebar.date_input('Start', value=(datetime(2021, 3, 1)))
 time_end = st.sidebar.date_input('End', today)
 
 # Database queries
@@ -114,17 +114,19 @@ df_grid['output_voltage']=df['output_voltage']
 df_grid['input_voltage_0tonan'].mask(df_grid['input_voltage']>0,df_grid['input_voltage'],inplace=True) #takes out the 0V data points
 df_grid['output_voltage_5tonan'].mask(df_grid['output_voltage']>5,df_grid['output_voltage'],inplace=True) #takes out the 5V data points
 
+df_grid.dropna(subset=['input_voltage'],inplace=True)#drop nan rows in df_grid
+
 df_grid['grid_avl'].mask(df['input_voltage']>0,1,inplace=True)
 df_grid['grid_avl'].mask(df['input_voltage']==0,0,inplace=True)
-df_grid['grid_avl']=df_grid['grid_avl'].fillna(0)#make all nan to 0 or BL
+#df_grid['grid_avl']=df_grid['grid_avl'].fillna(0)#make all nan to 0 or BL
 
 #writes 5 min in the dataset when grid voltage was higher or lower than 180V 
 df_grid['grid_on_time'].mask(df_grid['grid_avl']>0,5, inplace=True)#inplace overwrite the original data frame
-df_grid['grid_on_time'].replace(np.nan,0 ,inplace=True) #make all nan to 0 or BL 
+#df_grid['grid_on_time'].replace(np.nan,0 ,inplace=True) #make all nan to 0 or BL 
 df_grid['grid_off_time'].mask(df_grid['grid_avl']==0,5, inplace=True)
 
 df_grid['aam_on_time'].mask(df['input_voltage']>=0,5, inplace=True)
-df_grid['aam_off_time'].mask(np.isnan(df['input_voltage']),5,inplace=True)
+df_grid['aam_off_time'].mask(df['output_voltage']<=10,5, inplace=True)
 
 df_grid['counter_evt'] = df_grid['grid_avl'].diff().ne(0).cumsum()
 df_grid['counter_bl']  = df_grid['grid_avl'].diff() 
@@ -136,11 +138,12 @@ hour_data= pd.DataFrame(columns=['grid_avl_h','grid_avl_h_usb','load_w_h','pv_w_
 hour_data['grid_avl_h']=df_grid['grid_avl'].resample('H').mean()
 
 #daily_data
-daily_data= pd.DataFrame(columns=['E_Wh_daily','grid_on_time_daily','grid_off_time_daily','consumption','bl_daily'])
+daily_data= pd.DataFrame(columns=[])
 daily_data['grid_on_time_daily']=df_grid['grid_on_time'].resample('D').sum()/60
+daily_data['grid_on_time_daily'].replace(0,np.nan ,inplace=True) #make all nan to 0, just consider the days with >0 grid connection time 
 daily_data['grid_off_time_daily']=df_grid['grid_off_time'].resample('D').sum()/60
 daily_data['aam_on_time_daily']=df_grid['aam_on_time'].resample('D').sum()/60
-daily_data['aam_off_time_daily']=df_grid['grid_off_time'].resample('D').sum()/60
+daily_data['aam_off_time_daily']=df_grid['aam_off_time'].resample('D').sum()/60
 
 daily_data['bl_daily']=abs(df_grid['counter_bl'].resample('D').sum())
 
@@ -150,7 +153,7 @@ monthly_data['bl_monthly']=abs(df_grid['counter_bl'].resample('M').sum())
 
 #typ_day
 #Grouped hourly data to display one typical day
-typ_day=pd.DataFrame(columns=['avg_grid_avl','avg_grid_avl_usb','avg_load_w','avg_pv_w','avg_bat_v'])
+typ_day=pd.DataFrame(columns=[])
 typ_day['avg_grid_avl']=hour_data['grid_avl_h'].groupby(hour_data.index.hour).mean()
 
 #typ_day_all
@@ -175,11 +178,18 @@ df_grid_evt_off.index = df_grid_evt_off.index + 1
 ### VALUES
 
 # create usefull values from df
+
+days_selected= (time_end - time_start).days
+st.sidebar.text("days_selected:"+str(days_selected))
+
+days_with_data=len(daily_data[daily_data['aam_on_time_daily']>0])
+st.sidebar.text("days_with_data:"+str(days_with_data))
+
 avg_input_voltage = round((df_grid['input_voltage_0tonan'].mean()), 1)
 min_input_voltage = round((df_grid['input_voltage_0tonan'].min()), 1)
 max_input_voltage = round((df_grid['input_voltage_0tonan'].max()), 1)
 
-grid_on_time_all=round((sum(daily_data['grid_on_time_daily'])),1)
+grid_on_time_all=round((daily_data['grid_on_time_daily'].sum(skipna=True)),1)
 grid_off_time_all=round((sum(daily_data['grid_off_time_daily'])),1)
 
 aam_on_time_all=round((sum(daily_data['aam_on_time_daily'])),1)
@@ -189,6 +199,10 @@ avg_bl_duration = round((df_grid_evt_off['length_h'].mean()),1)
 max_bl_duration = round((df_grid_evt_off['length_h'].max()),1) 
 min_bl_duration = round((df_grid_evt_off['length_h'].min()),1)
 
+avg_grid_avl_daily = round((daily_data['grid_on_time_daily'].mean()),1)
+max_grid_avl_daily = round((daily_data['grid_on_time_daily'].max()),1) 
+min_grid_avl_daily = round((daily_data['grid_on_time_daily'].min()),1)
+
 avg_bl_nu_daily = round((daily_data['bl_daily'].mean()),1)
 min_bl_nu_daily = round((daily_data['bl_daily'].min()),1)
 max_bl_nu_daily = round((daily_data['bl_daily'].max()),1)
@@ -196,6 +210,8 @@ max_bl_nu_daily = round((daily_data['bl_daily'].max()),1)
 avg_bl_nu_monthly = round((monthly_data['bl_monthly'].mean()),1)
 min_bl_nu_monthly = round((monthly_data['bl_monthly'].min()),1)
 max_bl_nu_monthly = round((monthly_data['bl_monthly'].max()),1)
+
+
 
 with st.expander('Info'):
 
@@ -382,6 +398,88 @@ with st.expander('Grid Analysis'):
                                 )                                
         st.plotly_chart(fig, use_container_width=True)
         # fig.write_image("grid_V_box_plot.pdf")
+    #########################################
+    
+
+    st.markdown("<h3 style='text-align: center'>Daily hours with grid connection</h3>",
+                unsafe_allow_html=True)
+    
+    fig = go.Figure([go.Bar(y=daily_data['grid_on_time_daily'], x=daily_data.index, 
+                                name='hours of grid per day',
+                                marker_color='lightslategrey')],)
+
+    annotation_avg= "Avg: "+str(avg_grid_avl_daily) +"h" 
+    
+    fig.add_hline(y=avg_grid_avl_daily, 
+                        annotation_text= annotation_avg,
+                        line_color='dimgrey',
+                        annotation_position="bottom left",
+                        line_width=1,
+                            line_dash='dash')
+    annotation_min= "Min: "+str(min_grid_avl_daily) +"h "
+    fig.add_hline(y=min_grid_avl_daily, 
+                        annotation_text= annotation_min,
+                        line_color='dimgrey',
+                        annotation_position="bottom left",
+                        line_width=1,
+                            line_dash='dash')
+    annotation_max= "Max: "+str(max_grid_avl_daily) +"h "
+    fig.add_hline(y=max_grid_avl_daily, 
+                        annotation_text= annotation_max,
+                        line_color='dimgrey',
+                        annotation_position="bottom left",
+                        line_width=1,
+                            line_dash='dash')
+
+    fig.update_layout(  
+                        plot_bgcolor='white',
+                        xaxis=dict(
+                            showline=True,
+                            showgrid=True,
+                            showticklabels=True,
+                            linewidth=1.5,
+                            ticks='outside',
+                            title="Day/Month",
+                            gridcolor='lightgrey',
+                            linecolor='lightgrey',
+                            mirror=True,
+                            tickformat='%d/%m/%y', #%H:%M',
+                            tickfont=dict(family="Fugue",size=12, color='Black')
+                            #range=[0,110],
+                            ),
+                        yaxis=dict(
+                            title=" hours of grid per day",
+                            showgrid=True,
+                            zeroline=True,
+                            showline=True,
+                            linewidth=1.5,
+                            ticks='outside',
+                            linecolor='lightgrey',
+                            mirror=True,
+                            showticklabels=True,
+                            gridcolor='lightgrey',
+                            tickfont=dict(family="Fugue",size=12, color='Black'),
+                            #range=[140,250],
+                            ),
+                        font=dict( family="Fugue", size=12, color='black'),
+                        autosize=False,
+                        width=600, height=300,
+                        margin=dict(l=15, r=15, b=15, t=15,  pad=2),
+                        showlegend=False,
+                        legend=dict(title="",
+                                    orientation="h",
+                                    yanchor="bottom",
+                                    y=1.05,
+                                    xanchor="center",
+                                    traceorder='normal',
+                                    x=0.5,
+                                    ),
+                            )                             
+                        
+    st.plotly_chart(fig, use_container_width=True)
+    #fig.write_image("bl_freq_d.pdf")
+    
+    
     #########################################
 
     st.info('avg_input_voltage: '+str( avg_input_voltage))
