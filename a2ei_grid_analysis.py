@@ -1,16 +1,38 @@
 # cd Documents/git/a2ei_nigeria_grid_analysis/ ; streamlit run a2ei_grid_analysis.py
 
-import streamlit as st
-import psycopg2
+from sqlalchemy.engine import create_engine
+from datetime import datetime
 import pandas as pd
+from plotly_calplot import calplot
 import plotly.graph_objects as go
-import plotly.express as px
-from datetime import datetime, date, time, timedelta
 from plotly.subplots import make_subplots
-import numpy as np
+# import psycopg2
+import streamlit as st
 
 
-# Page design configutration
+# def init_connection():
+#     return psycopg2.connect(**st.secrets[db_select])
+
+
+def data_prep(df):
+    df = df.sort_values(by=['time'])
+    df['time'] = pd.to_datetime(df['time'])
+    df.set_index(df['time'], inplace=True)
+    return df
+
+
+# GLOBAL VARIABLES
+# db_select = "aws"
+db_select = "postgres"
+# psycopg2
+# conn = init_connection()
+# sqlalchemy
+db = st.secrets[db_select]
+conn = create_engine(
+    f"{db['lang']}://{db['user']}:{db['password']}@{db['host']}/{db['dbname']}")
+today = datetime.today()
+
+# PAGE
 st.set_page_config(
     page_title="A2EI Grid Analysis",
     page_icon=":sunny:",
@@ -18,39 +40,33 @@ st.set_page_config(
     layout="wide",
 )
 
-# st.markdown("<h1 style='text-align: center; color: rgb(223,116,149);'>A2EI Grid Analysis Tool</h1>",
-#             unsafe_allow_html=True)
-
 # SIDEBAR
-# logo
 st.sidebar.image("images/A2EI_horizontal_white_RGB.png",
-                 use_column_width=True)
+                 use_column_width=True)  # logo
 st.sidebar.text("")
 st.sidebar.text("")
-st.sidebar.text("")
-
-# Sidebar elements
-aam_id = str(st.sidebar.text_input('AAM ID', 945))  # Set System Name
-
-# change to "office" if you are in the A2EI headquarter for faster queries
-db_select = "aws"
-
-
-def init_connection():
-    return psycopg2.connect(**st.secrets[db_select])
-
-
-conn = init_connection()
-
-
-# set today's date
-today = datetime.today()
-
+# aam_id = str(st.sidebar.text_input('AAM ID', 945))  # Set System Name
+cust = pd.read_sql(f''' SELECT
+                           aam_id,
+                           country,
+                           location,
+                           latitude,
+                           longitude,
+                           cust_type,
+                           bat_size,
+                           inv_size,
+                           mcu_version,
+                           installation_date,
+                           installation_comp
+                        FROM
+                           skgs_customers
+                        ''', conn)
+aam_id = st.sidebar.selectbox('AAM ID', cust.aam_id)
 time_start = st.sidebar.date_input('Start', value=(datetime(2022, 3, 1)))
 time_end = st.sidebar.date_input('End', today)
-
-# Database queries
 rng = [time_start, time_end]
+
+# IMPORT DATA
 df = pd.read_sql(f'''       SELECT
                                 time + interval '1 hour' AS time
                                 ,input_voltage
@@ -63,37 +79,29 @@ df = pd.read_sql(f'''       SELECT
                                 time between \'{rng[0]}\' and \'{rng[1]}\'
                             ORDER BY time
                         ''', conn)
-cust = pd.read_sql(f''' SELECT
-                           aam_id, 
-                           country, 
-                           location, 
-                           latitude, 
-                           longitude,
-                           cust_type,
-                           bat_size, 
-                           inv_size,
-                           mcu_version,
-                           installation_date, 
-                           installation_comp
-                        FROM
-                           skgs_customers
-                        WHERE
-                           aam_id = {aam_id}
+data_density = pd.read_sql(f'''       SELECT
+                                time + interval '1 hour' AS time
+                                ,input_voltage
+                                ,peak_voltage
+                            FROM
+                                skgsp2_logs
+                            WHERE
+                                aam_id = {aam_id} AND
+                                time between '2021-01-01' and '2022-12-01'
+                            ORDER BY time
                         ''', conn)
+data_density = data_prep(data_density)
 
-# meta data about system
+# META DATA
 st.sidebar.text("")
 st.sidebar.text("")
-
 st.sidebar.markdown(
     f'<p style="color:#FFFFFF;font-size: 25px;text-align:center;">Meta Data AAM <strong>{aam_id}</strong> <br> </p>', unsafe_allow_html=True)
 st.sidebar.markdown(
     f'<p style="color:#FFFFFF;font-size: 20px;">{cust.country[0]} <br> Version {cust.mcu_version[0]} <br> Battery {cust.bat_size[0]} Ah <br> Inverter {cust.inv_size[0]} W <br > Installed on {cust.installation_date[0].strftime("%Y-%m-%d")} <br> Installed by {cust.installation_comp[0]} </p>', unsafe_allow_html=True)
 
-# Data prep
-df = df.sort_values(by=['time'])
-df['time'] = pd.to_datetime(df['time'])
-df.set_index(df['time'], inplace=True)
+# DATA PREPARATION
+df = data_prep(df)
 
 # Create other usefull columns in df
 df_grid = pd.DataFrame(columns=['input_voltage', 'peak_voltage', 'output_voltage',
@@ -112,14 +120,10 @@ df_grid['grid_avl'].mask(df['input_voltage'] > 0, 1, inplace=True)
 df_grid['grid_avl'].mask(df['input_voltage'] == 0, 0, inplace=True)
 df_grid['grid_avl'] = df_grid['grid_avl'].fillna(0)  # make all nan to 0 or BL
 
-# df_grid
-
 # resample the 5min data to 1 hour data
 hour_data = pd.DataFrame(
     columns=['grid_avl_h', 'grid_avl_h_usb', 'load_w_h', 'pv_w_h'])
 hour_data['grid_avl_h'] = df_grid['grid_avl'].resample('H').mean()
-
-# hour_data
 
 # Grouped hourly data to display one typical day
 typ_day = pd.DataFrame(
@@ -127,15 +131,11 @@ typ_day = pd.DataFrame(
 typ_day['avg_grid_avl'] = hour_data['grid_avl_h'].groupby(
     hour_data.index.hour).mean()
 
-# typ_day
-
 # group also by day of year to get all the points for every hour to plot box plot
 typ_day_all = pd.DataFrame(
     columns=['avg_grid_avl', 'avg_grid_avl_usb', 'avg_load_w', 'avg_pv_w', 'avg_bat_v'])
 typ_day_all['avg_grid_avl'] = df_grid['grid_avl'].groupby(
     [df_grid.index.dayofyear.rename('day of year'), df_grid.index.hour.rename('hour')]).mean()
-
-# typ_day_all
 
 # create usefull values from df
 avg_input_voltage = round((df_grid['input_voltage_0tonan'].mean()), 1)
@@ -146,20 +146,94 @@ avg_peak_voltage = round((df_grid['peak_voltage_0tonan'].mean()), 1)
 min_peak_voltage = round((df_grid['peak_voltage_0tonan'].min()), 1)
 max_peak_voltage = round((df_grid['peak_voltage_0tonan'].max()), 1)
 
+# with st.expander('Info'):
 
-with st.expander('Info'):
-
-    st.warning("under construction")
+#     st.warning("under construction")
 
 with st.expander('Data Overview all systems'):
 
     st.warning("under construction")
 
 
-with st.expander('Data Overview for AAM '+aam_id):
-
+# with st.expander('Data Overview for AAM '+aam_id):
+with st.expander('Data Overview for AAM'):
+    st.header("Number of Data Points Per Day (Grid Values Which are Not Null)")
+    # zero_count = st.checkbox('exclude grid = 0', key="count")
+    # if zero_count:
+    # density_inv = data_density.loc[(data_density.input_voltage.notnull()) &
+    #                                (data_density.input_voltage > 0)].input_voltage
+    # density_inv = density_inv.groupby([density_inv.index.floor('d')]).size().astype(
+    #     int).to_frame().reset_index(level=0)
+    # density_mcu = data_density.loc[(data_density.peak_voltage.notnull()) &
+    #                                (data_density.peak_voltage > 0)].peak_voltage
+    # density_mcu = density_mcu.groupby([density_mcu.index.floor('d')]).size().astype(
+    #     int).to_frame().reset_index(level=0)
+    # else:
+    density_inv = data_density.input_voltage.notnull().groupby(
+        [data_density.index.floor('d')]).sum().astype(int).to_frame().reset_index(level=0)
+    density_mcu = data_density.peak_voltage.notnull().groupby(
+        [data_density.index.floor('d')]).sum().astype(int).to_frame().reset_index(level=0)
+    st.caption("Inverter")
+    fig_inv = calplot(
+        density_inv,
+        x="time",
+        y="input_voltage",
+        name="data_points",
+        years_title=True
+    )
+    st.plotly_chart(fig_inv, use_container_width=True)
+    st.caption("MCU")
+    fig_mcu = calplot(
+        density_mcu,
+        x="time",
+        y="peak_voltage",
+        name="data_points",
+        years_title=True
+    )
+    st.plotly_chart(fig_mcu, use_container_width=True)
+    # -------------------------------------------
+    st.header("Average Grid Voltage Per Day, excluding Null and Zero Values")
+    # if zero_avg:
+    #     quality_inv = data_density.input_voltage.notnull().groupby(
+    #         [data_density.index.floor('d')]).mean().to_frame().reset_index(level=0)
+    #     quality_mcu = data_density.peak_voltage.notnull().groupby(
+    #         [data_density.index.floor('d')]).mean().to_frame().reset_index(level=0)
+    # else:
+    quality_inv = data_density.loc[(data_density.input_voltage.notnull()) &
+                                   (data_density.input_voltage > 0)].input_voltage
+    quality_inv = quality_inv.groupby([quality_inv.index.floor('d')]).mean().astype(
+        int).to_frame().reset_index(level=0)
+    quality_mcu = data_density.loc[(data_density.peak_voltage.notnull()) &
+                                   (data_density.peak_voltage > 0)].peak_voltage
+    quality_mcu = quality_mcu.groupby([quality_mcu.index.floor('d')]).mean().astype(
+        int).to_frame().reset_index(level=0)
+    if len(quality_inv) > 0:
+        st.caption("Inverter")
+        fig_inv_mean = calplot(
+            quality_inv,
+            x="time",
+            y="input_voltage",
+            name="mean",
+            years_title=True
+        )
+        st.plotly_chart(fig_inv_mean, use_container_width=True)
+    else:
+        st.warning("no data")
+    if len(quality_mcu) > 0:
+        st.caption("MCU")
+        fig_mcu_mean = calplot(
+            quality_mcu,
+            x="time",
+            y="peak_voltage",
+            name="mean",
+            years_title=True
+        )
+        st.plotly_chart(fig_mcu_mean, use_container_width=True)
+    else:
+        st.warning("no data")
+    # -------------------------------------------
+    st.header("Grid Measurements Over Selected Timespan")
     # Initial Plot
-
     final = make_subplots(specs=[[{"secondary_y": True}]])
     final.add_trace(go.Scatter(
         x=df.index, y=df['input_voltage'], name='input_voltage',  line_color='rgba(82, 82, 82, .8)'))
@@ -174,7 +248,7 @@ with st.expander('Data Overview for AAM '+aam_id):
                         width=500,
                         height=300,
                         title={
-                            'text':  "AAM ID: " + aam_id,
+                            # 'text':  "AAM ID: " + aam_id,
                             'y': 0.9,
                             'x': 0.5,
                             'xanchor': 'center',
@@ -184,10 +258,8 @@ with st.expander('Data Overview for AAM '+aam_id):
         ticks='outside',
         gridcolor='lightgrey',
         linecolor='lightgrey')
-
     final.update_xaxes(title="Hour of the Day",
                        row=2, col=1)
-
     final.update_yaxes(title_text='Voltage (V)',
                        showgrid=True,
                        secondary_y=False,
@@ -198,11 +270,7 @@ with st.expander('Data Overview for AAM '+aam_id):
                        gridcolor='lightgrey',
                        ticks='outside',
                        range=[0, 300])
-
     st.plotly_chart(final, use_container_width=True)
-
-    st.warning("under construction")
-# -------------------------------------------
 
 
 with st.expander('Grid Analysis'):
