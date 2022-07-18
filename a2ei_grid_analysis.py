@@ -20,8 +20,8 @@ def data_prep(df):
 
 
 # GLOBAL VARIABLES
-# db_select = "aws"
-db_select = "postgres"
+db_select = "aws"
+# db_select = "postgres"
 db = st.secrets[db_select]
 os.environ['lang'] = st.secrets[db_select]['lang']
 
