@@ -1,8 +1,9 @@
 # cd Documents/git/a2ei_nigeria_grid_analysis/ ; streamlit run a2ei_grid_analysis.py
 
-from sqlalchemy.engine import create_engine
+from sqlalchemy import create_engine
 from datetime import datetime
 import numpy as np
+import os
 import pandas as pd
 from plotly_calplot import calplot
 # import plotly.express as px
@@ -22,8 +23,14 @@ def data_prep(df):
 # db_select = "aws"
 db_select = "postgres"
 db = st.secrets[db_select]
+os.environ['lang'] = st.secrets[db_select]['lang']
+
+# conn = create_engine(
+#     f"{db['lang']}://{db['user']}:{db['password']}@{db['host']}/{db['dbname']}")
 conn = create_engine(
     f"{db['lang']}://{db['user']}:{db['password']}@{db['host']}/{db['dbname']}")
+# conn = create_engine(
+#     f"{**st.secrets[db_select]['lang']}://{**st.secrets[db_select]['user']}:{**st.secrets[db_select]['password']}@{**st.secrets[db_select]['host']}/{**st.secrets[db_select]['dbname']}")
 today = datetime.today()
 
 # PAGE
